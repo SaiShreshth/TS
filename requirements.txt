@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sentence-transformers
+faiss-cpu
+langchain
+openai-whisper
+torch
+numpy
+Pillow
+python-multipart
+neo4j
+git+https://github.com/openai/CLIP.git
