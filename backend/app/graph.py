@@ -38,19 +38,19 @@ def _seed_graph(tx):
 
 
 def query_graph(query: str):
-    cleaned = query.lower()
+    search_text = query.lower()
     with driver.session() as session:
         results = session.run(
             """
             MATCH (n)
-            WHERE toLower(coalesce(n.name, '')) CONTAINS $query
-               OR toLower(coalesce(n.code, '')) CONTAINS $query
-               OR toLower(coalesce(n.description, '')) CONTAINS $query
-               OR toLower(coalesce(n.summary, '')) CONTAINS $query
+            WHERE toLower(coalesce(n.name, '')) CONTAINS $search
+               OR toLower(coalesce(n.code, '')) CONTAINS $search
+               OR toLower(coalesce(n.description, '')) CONTAINS $search
+               OR toLower(coalesce(n.summary, '')) CONTAINS $search
             RETURN labels(n) AS labels, n.name AS name, n.description AS description, n.code AS code, n.summary AS summary
             LIMIT 5
             """,
-            query=cleaned,
+            search=search_text,
         )
         hits = []
         for record in results:

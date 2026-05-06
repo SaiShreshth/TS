@@ -1,10 +1,11 @@
 import os
 import numpy as np
 import faiss
-from langchain.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.embeddings import embed_text, embed_image, embed_clip_text, transcribe_audio
 from app.graph import init_graph, query_graph
+from app.llm import generate_explanation, generate_summary
 
 TEXT_DIM = 384
 IMAGE_DIM = 512
@@ -52,11 +53,18 @@ def ingest_pdf(path: str):
     init_graph()
     loader = PyPDFLoader(path)
     pages = loader.load()
+    page_texts = [page.page_content for page in pages]
+    summary = generate_summary(os.path.basename(path), page_texts)
     splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     chunks = splitter.split_documents(pages)
     for idx, chunk in enumerate(chunks):
         source = f"pdf:{os.path.basename(path)}:{idx}"
         add_text_document(chunk.page_content, source)
+    return {
+        "summary": summary,
+        "page_count": len(pages),
+        "chunk_count": len(chunks),
+    }
 
 
 def ingest_image(path: str):
@@ -113,30 +121,40 @@ def generate_response(query: str):
     graph_hits = query_graph(query)
 
     context_blocks = []
+    llm_context_parts = []
     if text_hits:
         context_blocks.append("Text snippets:")
         for hit in text_hits:
             context_blocks.append(f"- [{hit['source']}] {hit['text'][:250]}...")
+            llm_context_parts.append(f"[{hit['source']}] {hit['text']}")
     if image_hits:
         context_blocks.append("Image matches:")
         for hit in image_hits:
             context_blocks.append(f"- {hit['image']} (score={hit['score']:.3f})")
+            llm_context_parts.append(
+                f"[image:{hit['image']}] score={hit['score']:.3f}"
+            )
     if graph_hits:
         context_blocks.append("Graph matches:")
         for hit in graph_hits:
             context_blocks.append(f"- {hit}")
+            llm_context_parts.append(f"[graph] {hit}")
 
     if not context_blocks:
+        explanation = generate_explanation(query, llm_context_parts)
         return {
             "answer": "No relevant data found. Please upload legal or policy documents first.",
             "context": [],
             "query": query,
+            "explanation": explanation,
         }
 
     answer = (
         "I retrieved relevant legal context from uploaded documents and the knowledge graph. "
         "Review the matching text chunks, image references, and graph entities below."
     )
+
+    explanation = generate_explanation(query, llm_context_parts)
 
     return {
         "answer": answer,
@@ -145,4 +163,5 @@ def generate_response(query: str):
         "text_hits": text_hits,
         "image_hits": image_hits,
         "graph_hits": graph_hits,
+        "explanation": explanation,
     }

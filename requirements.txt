@@ -3,6 +3,9 @@ uvicorn[standard]
 sentence-transformers
 faiss-cpu
 langchain
+langchain-community
+langchain-text-splitters
+google-generativeai
 openai-whisper
 torch
 numpy
@@ -10,3 +13,4 @@ Pillow
 python-multipart
 neo4j
 git+https://github.com/openai/CLIP.git
+pypdf
