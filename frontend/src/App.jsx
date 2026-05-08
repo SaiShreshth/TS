@@ -23,7 +23,6 @@ const buildStagesForType = (type) => {
     { name: "Upload" },
     { name: "RAG indexing" },
     { name: "Knowledge graph update" },
-    { name: "Summary" },
   ];
 };
 
@@ -129,14 +128,26 @@ function App() {
     setInput("");
     setIsQuerying(true);
 
+    const chatMessages = messages
+      .map((message) => {
+        if (message.role === "user") {
+          return { role: "user", text: message.text };
+        }
+        return { role: "assistant", text: message.answer || "" };
+      })
+      .filter((message) => message.text)
+      .slice(-8);
+
     try {
-      const response = await axios.post(`${baseUrl}/query`, { text });
+      const response = await axios.post(`${baseUrl}/query`, {
+        text,
+        messages: chatMessages,
+      });
       const payload = response.data.response;
       const assistantMessage = {
         id: makeId(),
         role: "assistant",
         answer: payload.answer,
-        explanation: payload.explanation,
         context: payload.context || [],
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -147,8 +158,7 @@ function App() {
           id: makeId(),
           role: "assistant",
           answer: "Query failed",
-          explanation: error.response?.data?.detail || error.message,
-          context: [],
+          context: [error.response?.data?.detail || error.message],
         },
       ]);
     } finally {
@@ -575,16 +585,10 @@ function App() {
                   ) : (
                     <>
                       <div className="assistant-title">Assistant</div>
-                      <div>{message.answer}</div>
-                      {message.explanation ? (
-                        <div className="context-block">
-                          <strong>Explanation</strong>
-                          <div>{message.explanation}</div>
-                        </div>
-                      ) : null}
+                      {message.answer ? <div>{message.answer}</div> : null}
                       {message.context?.length ? (
                         <details className="context-block">
-                          <summary>Context</summary>
+                          <summary>Retrieved context</summary>
                           <ul>
                             {message.context.map((item, index) => (
                               <li key={`${message.id}-${index}`}>{item}</li>

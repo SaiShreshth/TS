@@ -12,8 +12,14 @@ def _build_stage(name: str, status: str = "done", detail: str | None = None):
         stage["detail"] = detail
     return stage
 
+class ChatMessage(BaseModel):
+    role: str
+    text: str
+
+
 class Query(BaseModel):
     text: str
+    messages: list[ChatMessage] | None = None
 
 @router.post("/upload/pdf")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -26,11 +32,9 @@ async def upload_pdf(file: UploadFile = File(...)):
         _build_stage("Upload", "done"),
         _build_stage("RAG indexing", "done", f"{result['chunk_count']} chunks"),
         _build_stage("Knowledge graph update", "done"),
-        _build_stage("Summary", "done"),
     ]
     return {
         "message": "PDF processed",
-        "summary": result["summary"],
         "stages": stages,
         "stats": {
             "pages": result["page_count"],
@@ -69,4 +73,4 @@ async def upload_audio(file: UploadFile = File(...)):
 
 @router.post("/query")
 def query(data: Query):
-    return {"response": generate_response(data.text)}
+    return {"response": generate_response(data.text, data.messages)}

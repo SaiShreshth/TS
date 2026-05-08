@@ -1,12 +1,36 @@
 import os
+import logging
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request # Added Request
 from fastapi.responses import JSONResponse # Added JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router
 
-# Load environment variables from .env file
-load_dotenv()
+logger = logging.getLogger("app.env")
+
+# Load environment variables from repo-root .env file
+BASE_DIR = Path(__file__).resolve().parents[2]
+DOTENV_PATH = BASE_DIR / ".env"
+dotenv_loaded = load_dotenv(dotenv_path=DOTENV_PATH)
+
+logger.info("Env load: %s", "loaded" if dotenv_loaded else "not found")
+logger.info("Env path: %s", DOTENV_PATH)
+
+test_value = os.getenv("test") or os.getenv("TEST")
+if test_value is None:
+    logger.warning("Env check: test variable missing. Set test=correct in .env.")
+elif test_value != "correct":
+    logger.warning("Env check: test variable mismatch. Expected 'correct', got '%s'.", test_value)
+else:
+    logger.info("Env check: test variable loaded correctly.")
+
+logger.info(
+    "Env check: GEMINI_API_KEY %s",
+    "set" if os.getenv("GEMINI_API_KEY") else "missing",
+)
+logger.info("Env check: GEMINI_MODEL=%s", os.getenv("GEMINI_MODEL") or "<default>")
+
 app = FastAPI()
 
 # 1. Define origins
