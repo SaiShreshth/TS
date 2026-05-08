@@ -12,5 +12,6 @@ numpy
 Pillow
 python-multipart
 neo4j
+python-dotenv
 git+https://github.com/openai/CLIP.git
 pypdf

@@ -1,9 +1,12 @@
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request # Added Request
 from fastapi.responses import JSONResponse # Added JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router
 
+# Load environment variables from .env file
+load_dotenv()
 app = FastAPI()
 
 # 1. Define origins

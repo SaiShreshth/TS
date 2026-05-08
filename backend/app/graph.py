@@ -1,13 +1,53 @@
+import os
+import time
 from neo4j import GraphDatabase
 
-NEO4J_URI = "bolt://neo4j:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "password"
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+
+NEO4J_CONNECT_RETRIES = int(os.getenv("NEO4J_CONNECT_RETRIES", "8"))
+NEO4J_CONNECT_BACKOFF_SECONDS = float(os.getenv("NEO4J_CONNECT_BACKOFF_SECONDS", "1"))
+NEO4J_CONNECT_MAX_BACKOFF_SECONDS = float(os.getenv("NEO4J_CONNECT_MAX_BACKOFF_SECONDS", "5"))
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+_driver_ready = False
+
+
+def _ensure_connection():
+    global driver, _driver_ready
+    if _driver_ready:
+        return
+
+    retries = max(1, NEO4J_CONNECT_RETRIES)
+    base_delay = max(0.0, NEO4J_CONNECT_BACKOFF_SECONDS)
+    max_delay = max(base_delay, NEO4J_CONNECT_MAX_BACKOFF_SECONDS)
+    last_error = None
+
+    for attempt in range(1, retries + 1):
+        try:
+            driver.verify_connectivity()
+            _driver_ready = True
+            return
+        except Exception as exc:
+            last_error = exc
+            _driver_ready = False
+            try:
+                driver.close()
+            except Exception:
+                pass
+            driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+            if attempt == retries:
+                raise
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            time.sleep(delay)
+
+    if last_error:
+        raise last_error
 
 
 def init_graph():
+    _ensure_connection()
     with driver.session() as session:
         session.execute_write(_create_constraints)
         session.execute_write(_seed_graph)
@@ -38,6 +78,7 @@ def _seed_graph(tx):
 
 
 def query_graph(query: str):
+    _ensure_connection()
     search_text = query.lower()
     with driver.session() as session:
         results = session.run(
